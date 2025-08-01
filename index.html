@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>IP Geo Locator + Mappa interattiva</title>
+
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-sA+tdNtm6N8yMZz6HPQiUJDbt+3HhZj6xSvG2u9S/30="
+  crossorigin=""
+/>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 1em;
+    background: #f9f9f9;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  header {
+    margin-bottom: 1em;
+  }
+
+  h1 {
+    font-size: 1.4em;
+    margin: 0 0 0.4em;
+  }
+
+  button, input[type="text"] {
+    font-size: 1em;
+    padding: 0.5em;
+    margin: 0.2em 0.5em 0.5em 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    outline: none;
+  }
+
+  button {
+    background-color: #0078D7;
+    color: white;
+    border: none;
+    cursor: pointer;
+    min-width: 140px;
+  }
+  button:disabled {
+    background-color: #a1c3f7;
+    cursor: not-allowed;
+  }
+
+  input[type="text"] {
+    width: 250px;
+    max-width: 100%;
+  }
+
+  #output {
+    background: #222;
+    color: #eee;
+    padding: 1em;
+    overflow-y: auto;
+    height: 25vh;
+    font-size: 0.9em;
+    border-radius: 5px;
+  }
+
+  #map {
+    flex-grow: 1;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 1em;
+  }
+
+  footer {
+    margin-top: 1em;
+    font-size: 0.85em;
+    color: #555;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width: 600px) {
+    body {
+      padding: 0.5em;
+    }
+    button, input[type="text"] {
+      width: 100%;
+      margin: 0.3em 0;
+    }
+    #output {
+      height: 30vh;
+      font-size: 0.8em;
+    }
+  }
+</style>
+
+</head>
+<body>
+
+<header>
+  <h1>IP Geo Locator + Mappa interattiva</h1>
+  <button id="genera50">Genera 50 IP casuali</button>
+  <input type="text" id="cercaIP" placeholder="Cerca IP..." />
+  <a id="download" href="#" download="dati_geoip.json" style="display:none;">Scarica JSON</a>
+</header>
+
+<pre id="output">Premi "Genera 50 IP casuali" per iniziare...</pre>
+<div id="map" aria-label="Mappa con localizzazione IP" role="region"></div>
+
+<footer>
+  <p>Nota: I dati provengono da <a href="https://ip-api.com/" target="_blank" rel="noopener noreferrer">ip-api.com</a>.  
+  Il download JSON salva i dati attualmente visualizzati.</p>
+</footer>
+
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o8HfHwC7FBCJ3aPcBuFwWozgj4IChh3Xj6p3WtNJ0XE="
+  crossorigin=""
+></script>
+
+<script>
+(() => {
+  const output = document.getElementById('output');
+  const downloadLink = document.getElementById('download');
+  const generaBtn = document.getElementById('genera50');
+  const cercaInput = document.getElementById('cercaIP');
+
+  let datiGeoIP = [];
+  let markers = [];
+
+  // Setup mappa Leaflet
+  const map = L.map('map', {tap: false}).setView([20, 0], 2);
+
+  // Tile layer OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Funzione per generare IP casuale ben distinguibile
+  // Per evitare IP privati e loopback, evitiamo range 10.x.x.x, 192.168.x.x, 172.16-31.x.x e 127.x.x.x
+  // Generiamo solo IP pubblici comuni (1-223 range per primo ottetto senza riservati)
+  function generaIPcasuale() {
+    const ott1 = Math.floor(Math.random() * 223) + 1;
+    // escludi range privati
+    if ([10, 127, 169, 172, 192].includes(ott1)) return generaIPcasuale();
+    const ott2 = Math.floor(Math.random() * 256);
+    const ott3 = Math.floor(Math.random() * 256);
+    const ott4 = Math.floor(Math.random() * 256);
+    return `${ott1}.${ott2}.${ott3}.${ott4}`;
+  }
+
+  async function ottieniGeoIP(ip) {
+    const url = `https://ip-api.com/json/${ip}?fields=status,message,continent,country,regionName,city,lat,lon,query`;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('Errore API');
+      const data = await resp.json();
+      if(data.status !== 'success') throw new Error(data.message || 'IP non localizzabile');
+      return {
+        ip: data.query,
+        lat: data.lat,
+        lon: data.lon,
+        city: data.city || '',
+        region: data.regionName || '',
+        country: data.country || '',
+        continent: data.continent || ''
+      };
+    } catch(e) {
+      // console.warn(`IP ${ip} non localizzabile:`, e.message);
+      return null;
+    }
+  }
+
+  function aggiornaOutput(dati) {
+    if(dati.length === 0) {
+      output.textContent = 'Nessun dato da mostrare';
+      downloadLink.style.display = 'none';
+      return;
+    }
+    output.textContent = JSON.stringify(dati, null, 2);
+    downloadLink.style.display = 'inline-block';
+
+    // Aggiorna link download
+    const blob = new Blob([JSON.stringify(dati, null, 2)], {type: 'application/json'});
+    downloadLink.href = URL.createObjectURL(blob);
+  }
+
+  function pulisciMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  function aggiungiMarkers(dati) {
+    pulisciMarkers();
+    dati.forEach(d => {
+      if(d.lat && d.lon) {
+        const marker = L.marker([d.lat, d.lon]).addTo(map);
+        marker.bindPopup(`<b>${d.ip}</b><br>${d.city}, ${d.region}, ${d.country}`);
+        markers.push(marker);
+      }
+    });
+    if(markers.length > 0) {
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds().pad(0.3));
+    }
+  }
+
+  // Filtra dati in base a stringa IP
+  function filtraDati(term) {
+    if(!term) return datiGeoIP;
+    return datiGeoIP.filter(d => d.ip.includes(term));
+  }
+
+  // Funzione principale: genera 50 IP, recupera geolocalizzazione
+  async function genera50IP() {
+    generaBtn.disabled = true;
+    output.textContent = 'Sto generando e localizzando 50 IP, attendi...';
+    datiGeoIP = [];
+    pulisciMarkers();
+
+    let count = 0;
+    while(count < 50) {
+      const ip = generaIPcasuale();
+      const geo = await ottieniGeoIP(ip);
+      if(geo) {
+        datiGeoIP.push(geo);
+        count++;
+        output.textContent = `Generati ${count}/50 IP...`;
+      }
+    }
+
+    // Aggiorna UI
+    aggiornaOutput(datiGeoIP);
+    aggiungiMarkers(datiGeoIP);
+    generaBtn.disabled = false;
+  }
+
+  // Eventi
+  generaBtn.addEventListener('click', genera50IP);
+
+  cercaInput.addEventListener('input', () => {
+    const term = cercaInput.value.trim();
+    const filtrati = filtraDati(term);
+    aggiornaOutput(filtrati);
+    aggiungiMarkers(filtrati);
+  });
+
+  // All'avvio visualizza messaggio
+  aggiornaOutput([]);
+})();
+</script>
+
+</body>
+</html>

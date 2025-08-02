@@ -57,49 +57,71 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// Dati IP con posizione (40 entry esempio)
-const ipData = [
-  {"ip":"23.45.67.89","lat":40.7128,"lon":-74.006,"city":"New York","region":"New York","country":"United States"},
-  {"ip":"54.23.123.45","lat":37.7749,"lon":-122.4194,"city":"San Francisco","region":"California","country":"United States"},
-  {"ip":"88.77.66.55","lat":51.5074,"lon":-0.1278,"city":"London","region":"England","country":"United Kingdom"},
-  {"ip":"91.12.34.56","lat":48.8566,"lon":2.3522,"city":"Paris","region":"Île-de-France","country":"France"},
-  {"ip":"105.34.23.1","lat":35.6895,"lon":139.6917,"city":"Tokyo","region":"Tokyo","country":"Japan"},
-  {"ip":"201.45.67.89","lat":-23.5505,"lon":-46.6333,"city":"São Paulo","region":"São Paulo","country":"Brazil"},
-  {"ip":"152.67.89.34","lat":55.7558,"lon":37.6173,"city":"Moscow","region":"Moscow","country":"Russia"},
-  {"ip":"194.65.32.10","lat":52.5200,"lon":13.4050,"city":"Berlin","region":"Berlin","country":"Germany"},
-  {"ip":"122.45.67.89","lat":1.3521,"lon":103.8198,"city":"Singapore","region":"Singapore","country":"Singapore"},
-  {"ip":"143.89.67.45","lat":41.9028,"lon":12.4964,"city":"Rome","region":"Lazio","country":"Italy"},
-  {"ip":"23.89.34.12","lat":43.6532,"lon":-79.3832,"city":"Toronto","region":"Ontario","country":"Canada"},
-  {"ip":"172.16.45.67","lat":34.0522,"lon":-118.2437,"city":"Los Angeles","region":"California","country":"United States"},
-  {"ip":"89.76.54.32","lat":59.3293,"lon":18.0686,"city":"Stockholm","region":"Stockholm","country":"Sweden"},
-  {"ip":"66.77.88.99","lat":40.4168,"lon":-3.7038,"city":"Madrid","region":"Community of Madrid","country":"Spain"},
-  {"ip":"201.34.56.78","lat":-34.6037,"lon":-58.3816,"city":"Buenos Aires","region":"Buenos Aires","country":"Argentina"},
-  {"ip":"148.67.89.23","lat":39.9042,"lon":116.4074,"city":"Beijing","region":"Beijing","country":"China"},
-  {"ip":"203.0.113.45","lat":28.6139,"lon":77.209,"city":"New Delhi","region":"Delhi","country":"India"},
-  {"ip":"80.65.43.21","lat":50.1109,"lon":8.6821,"city":"Frankfurt","region":"Hesse","country":"Germany"},
-  {"ip":"131.107.23.45","lat":45.4642,"lon":9.1900,"city":"Milan","region":"Lombardy","country":"Italy"},
-  {"ip":"203.45.67.89","lat":-33.8688,"lon":151.2093,"city":"Sydney","region":"New South Wales","country":"Australia"},
-  {"ip":"65.43.21.09","lat":37.3382,"lon":-121.8863,"city":"San Jose","region":"California","country":"United States"},
-  {"ip":"77.88.99.11","lat":43.7696,"lon":11.2558,"city":"Florence","region":"Tuscany","country":"Italy"},
-  {"ip":"109.78.65.43","lat":35.6762,"lon":139.6503,"city":"Tokyo","region":"Tokyo","country":"Japan"},
-  {"ip":"213.45.67.89","lat":55.9533,"lon":-3.1883,"city":"Edinburgh","region":"Scotland","country":"United Kingdom"},
-  {"ip":"84.56.78.90","lat":59.9139,"lon":10.7522,"city":"Oslo","region":"Oslo","country":"Norway"},
-  {"ip":"98.76.54.32","lat":25.2048,"lon":55.2708,"city":"Dubai","region":"Dubai","country":"United Arab Emirates"},
-  {"ip":"172.31.88.45","lat":19.4326,"lon":-99.1332,"city":"Mexico City","region":"CDMX","country":"Mexico"},
-  {"ip":"150.23.45.67","lat":37.5665,"lon":126.978,"city":"Seoul","region":"Seoul","country":"South Korea"},
-  {"ip":"202.54.31.78","lat":1.2903,"lon":103.8519,"city":"Singapore","region":"Singapore","country":"Singapore"},
-  {"ip":"88.77.66.44","lat":60.1699,"lon":24.9384,"city":"Helsinki","region":"Uusimaa","country":"Finland"},
-  {"ip":"122.45.67.88","lat":39.7392,"lon":-104.9903,"city":"Denver","region":"Colorado","country":"United States"},
-  {"ip":"143.89.67.44","lat":51.1657,"lon":10.4515,"city":"Germany","region":"Hesse","country":"Germany"},
-  {"ip":"23.89.34.11","lat":55.6761,"lon":12.5683,"city":"Copenhagen","region":"Capital Region","country":"Denmark"},
-  {"ip":"172.16.45.66","lat":45.4215,"lon":-75.6972,"city":"Ottawa","region":"Ontario","country":"Canada"},
-  {"ip":"89.76.54.31","lat":40.7306,"lon":-73.9352,"city":"New York","region":"New York","country":"United States"},
-  {"ip":"66.77.88.98","lat":48.2082,"lon":16.3738,"city":"Vienna","region":"Vienna","country":"Austria"},
-  {"ip":"201.34.56.77","lat":50.8503,"lon":4.3517,"city":"Brussels","region":"Brussels-Capital","country":"Belgium"},
-  {"ip":"148.67.89.22","lat":41.3851,"lon":2.1734,"city":"Barcelona","region":"Catalonia","country":"Spain"},
-  {"ip":"203.0.113.44","lat":31.2304,"lon":121.4737,"city":"Shanghai","region":"Shanghai","country":"China"}
-];
+  function initializeMap() {
+  const map = L.map('map').setView([20, 0], 2);
 
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  ipData.forEach(({ip, lat, lon, city, region, country}) => {
+    L.circleMarker([lat, lon], {
+      radius: 6,
+      color: '#007bff',
+      fillColor: '#3399ff',
+      fillOpacity: 0.7,
+      weight: 1
+    })
+    .addTo(map)
+    .bindPopup(`<b>${ip}</b><br>${city}, ${region}, ${country}`);
+  });
+
+  const searchInput = document.getElementById('searchInput');
+  const resultsDiv = document.getElementById('results');
+
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.trim();
+    resultsDiv.innerHTML = '';
+
+    if(query.length === 0) return;
+
+    const results = ipData.filter(item => item.ip.includes(query));
+
+    if(results.length === 0) {
+      resultsDiv.innerHTML = '<div>Nessun risultato</div>';
+      return;
+    }
+
+    results.forEach(({ip, lat, lon, city, region, country}) => {
+      const div = document.createElement('div');
+      div.classList.add('result-item');
+      div.textContent = `${ip} - ${city}, ${region}, ${country}`;
+      div.onclick = () => {
+        map.setView([lat, lon], 10);
+        L.popup()
+          .setLatLng([lat, lon])
+          .setContent(`<b>${ip}</b><br>${city}, ${region}, ${country}`)
+          .openOn(map);
+      };
+      resultsDiv.appendChild(div);
+    });
+  });
+}
+
+// Carica i dati IP con posizione dal JSON esterno
+let ipData = [];
+
+fetch('./ip_data.json')
+  .then(response => response.json())
+  .then(data => {
+    ipData = data;
+    initializeMap();
+  })
+  .catch(error => {
+    console.error('Errore nel caricamento del file JSON:', error);
+  });
+  
 // Inizializza mappa
 document.addEventListener('DOMContentLoaded', () => {
   const map = L.map('map').setView([20, 0], 2);

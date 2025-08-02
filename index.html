@@ -1,182 +1,126 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Mappa IP GeoLocalizzati</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mappa IP GeoLocalizzati</title>
 
-<!-- Leaflet CSS senza integrity -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 
-<style>
-  body, html {
-    margin: 0; padding: 0; height: 100%;
-    font-family: Arial, sans-serif;
-  }
-  #map { 
-    height: 70vh; 
-    width: 100%; 
-  }
-  #searchContainer {
-    padding: 10px;
-    background: #f9f9f9;
-  }
-  #searchInput {
-    width: 100%;
-    padding: 8px;
-    font-size: 1em;
-    box-sizing: border-box;
-  }
-  #results {
-    max-height: 150px;
-    overflow-y: auto;
-    margin-top: 10px;
-  }
-  .result-item {
-    padding: 6px;
-    border-bottom: 1px solid #ddd;
-    cursor: pointer;
-  }
-  .result-item:hover {
-    background: #eee;
-  }
-</style>
+  <style>
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #map { 
+      height: 70vh; 
+      width: 100%; 
+    }
+    #searchContainer {
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    #searchInput {
+      width: 100%;
+      padding: 8px;
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+    #results {
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .result-item {
+      padding: 6px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+    }
+    .result-item:hover {
+      background: #eee;
+    }
+  </style>
 </head>
 <body>
 
-<div id="searchContainer">
-  <input type="text" id="searchInput" placeholder="Cerca IP..." />
-  <div id="results"></div>
-</div>
-<div id="map"></div>
+  <div id="searchContainer">
+    <input type="text" id="searchInput" placeholder="Cerca IP..." />
+    <div id="results"></div>
+  </div>
+  <div id="map"></div>
 
-<!-- Leaflet JS senza integrity -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script>
-  function initializeMap() {
-  const map = L.map('map').setView([20, 0], 2);
+  <script>
+    let ipData = [];
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+    fetch('./ip_data.json')
+      .then(response => response.json())
+      .then(data => {
+        ipData = data;
+        initializeMap();
+      })
+      .catch(error => {
+        console.error('Errore nel caricamento del file JSON:', error);
+      });
 
-  ipData.forEach(({ip, lat, lon, city, region, country}) => {
-    L.circleMarker([lat, lon], {
-      radius: 6,
-      color: '#007bff',
-      fillColor: '#3399ff',
-      fillOpacity: 0.7,
-      weight: 1
-    })
-    .addTo(map)
-    .bindPopup(`<b>${ip}</b><br>${city}, ${region}, ${country}`);
-  });
+    function initializeMap() {
+      const map = L.map('map').setView([20, 0], 2);
 
-  const searchInput = document.getElementById('searchInput');
-  const resultsDiv = document.getElementById('results');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
 
-  searchInput.addEventListener('input', () => {
-    const query = searchInput.value.trim();
-    resultsDiv.innerHTML = '';
+      ipData.forEach(({ ip, lat, lon, city, region, country }) => {
+        L.circleMarker([lat, lon], {
+          radius: 6,
+          color: '#007bff',
+          fillColor: '#3399ff',
+          fillOpacity: 0.7,
+          weight: 1
+        })
+          .addTo(map)
+          .bindPopup(`<b>${ip}</b><br>${city}, ${region}, ${country}`);
+      });
 
-    if(query.length === 0) return;
+      const searchInput = document.getElementById('searchInput');
+      const resultsDiv = document.getElementById('results');
 
-    const results = ipData.filter(item => item.ip.includes(query));
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim();
+        resultsDiv.innerHTML = '';
 
-    if(results.length === 0) {
-      resultsDiv.innerHTML = '<div>Nessun risultato</div>';
-      return;
+        if (query.length === 0) return;
+
+        const results = ipData.filter(item => item.ip.includes(query));
+
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<div>Nessun risultato</div>';
+          return;
+        }
+
+        results.forEach(({ ip, lat, lon, city, region, country }) => {
+          const div = document.createElement('div');
+          div.classList.add('result-item');
+          div.textContent = `${ip} - ${city}, ${region}, ${country}`;
+          div.onclick = () => {
+            map.setView([lat, lon], 10);
+            L.popup()
+              .setLatLng([lat, lon])
+              .setContent(`<b>${ip}</b><br>${city}, ${region}, ${country}`)
+              .openOn(map);
+          };
+          resultsDiv.appendChild(div);
+        });
+      });
     }
-
-    results.forEach(({ip, lat, lon, city, region, country}) => {
-      const div = document.createElement('div');
-      div.classList.add('result-item');
-      div.textContent = `${ip} - ${city}, ${region}, ${country}`;
-      div.onclick = () => {
-        map.setView([lat, lon], 10);
-        L.popup()
-          .setLatLng([lat, lon])
-          .setContent(`<b>${ip}</b><br>${city}, ${region}, ${country}`)
-          .openOn(map);
-      };
-      resultsDiv.appendChild(div);
-    });
-  });
-}
-
-// Carica i dati IP con posizione dal JSON esterno
-let ipData = [];
-
-fetch('./ip_data.json')
-  .then(response => response.json())
-  .then(data => {
-    ipData = data;
-    initializeMap();
-  })
-  .catch(error => {
-    console.error('Errore nel caricamento del file JSON:', error);
-  });
-  
-// Inizializza mappa
-document.addEventListener('DOMContentLoaded', () => {
-  const map = L.map('map').setView([20, 0], 2);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Aggiungi marker per ogni IP
-  ipData.forEach(({ip, lat, lon, city, region, country}) => {
-    L.circleMarker([lat, lon], {
-      radius: 6,
-      color: '#007bff',
-      fillColor: '#3399ff',
-      fillOpacity: 0.7,
-      weight: 1
-    })
-    .addTo(map)
-    .bindPopup(`<b>${ip}</b><br>${city}, ${region}, ${country}`);
-  });
-
-  // Funzione ricerca IP
-  const searchInput = document.getElementById('searchInput');
-  const resultsDiv = document.getElementById('results');
-
-  searchInput.addEventListener('input', () => {
-    const query = searchInput.value.trim();
-    resultsDiv.innerHTML = '';
-
-    if(query.length === 0) return;
-
-    const results = ipData.filter(item => item.ip.includes(query));
-
-    if(results.length === 0) {
-      resultsDiv.innerHTML = '<div>Nessun risultato</div>';
-      return;
-    }
-
-    results.forEach(({ip, lat, lon, city, region, country}) => {
-      const div = document.createElement('div');
-      div.classList.add('result-item');
-      div.textContent = `${ip} - ${city}, ${region}, ${country}`;
-      div.onclick = () => {
-        map.setView([lat, lon], 10);
-        L.popup()
-          .setLatLng([lat, lon])
-          .setContent(`<b>${ip}</b><br>${city}, ${region}, ${country}`)
-          .openOn(map);
-      };
-      resultsDiv.appendChild(div);
-    });
-  });
-});
-</script>
+  </script>
 
 </body>
 </html>
